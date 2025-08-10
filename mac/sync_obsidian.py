@@ -66,13 +66,51 @@ def sync_to_obsidian():
     except Exception as e:
         print(f"❌ Sync failed: {str(e)}")
 
+def get_task_links(task_id):
+    """Get all links for a task"""
+    dynamodb = boto3.resource('dynamodb')
+    links_table = dynamodb.Table('task-links')
+    tasks_table = dynamodb.Table('tasks')
+    
+    links = []
+    
+    # Get outgoing links
+    response = links_table.query(
+        KeyConditionExpression='source_task_id = :task_id',
+        ExpressionAttributeValues={':task_id': task_id}
+    )
+    
+    for link in response['Items']:
+        target_task = tasks_table.get_item(Key={'id': link['target_task_id']})
+        if 'Item' in target_task:
+            links.append({
+                'id': link['target_task_id'],
+                'task': target_task['Item']['task'],
+                'direction': 'outgoing'
+            })
+    
+    # Get incoming links
+    response = links_table.scan(
+        FilterExpression='target_task_id = :task_id',
+        ExpressionAttributeValues={':task_id': task_id}
+    )
+    
+    for link in response['Items']:
+        source_task = tasks_table.get_item(Key={'id': link['source_task_id']})
+        if 'Item' in source_task:
+            links.append({
+                'id': link['source_task_id'],
+                'task': source_task['Item']['task'],
+                'direction': 'incoming'
+            })
+    
+    return links
+
 def write_task_to_obsidian(task, vault_path):
-    """Write a single task to Obsidian vault"""
-    # Create category folder
+    """Write a single task to Obsidian vault with links"""
     category_path = vault_path / 'Tasks' / task['category']
     category_path.mkdir(parents=True, exist_ok=True)
     
-    # Create filename
     date_str = datetime.now().strftime('%Y-%m-%d')
     task_id_short = task['id'][:8]
     safe_task = "".join(c for c in task['task'][:30] if c.isalnum() or c in (' ', '-', '_')).strip()
@@ -80,7 +118,19 @@ def write_task_to_obsidian(task, vault_path):
     
     file_path = category_path / filename
     
-    # Create markdown content
+    # Get task links
+    links = get_task_links(task['id'])
+    
+    # Create links section
+    links_section = ""
+    if links:
+        links_section = "\n## Related Tasks\n"
+        for link in links:
+            link_id_short = link['id'][:8]
+            safe_link_task = "".join(c for c in link['task'][:30] if c.isalnum() or c in (' ', '-', '_')).strip()
+            link_filename = f"*-*-{safe_link_task}-{link_id_short}"
+            links_section += f"- [[{link_filename}|{link['task']}]]\n"
+    
     tags_str = " ".join([f"#{tag}" for tag in task.get('tags', [])])
     
     content = f"""# {task['task']}
@@ -95,7 +145,7 @@ def write_task_to_obsidian(task, vault_path):
 
 ## Notes
 - [ ] {task['task']}
-
+{links_section}
 ## Details
 <!-- Add additional notes, links, or details here -->
 
@@ -103,7 +153,6 @@ def write_task_to_obsidian(task, vault_path):
 *Auto-generated from task organizer - ID: {task['id']}*
 """
     
-    # Write to file
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(content)
     

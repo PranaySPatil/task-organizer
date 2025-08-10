@@ -6,16 +6,15 @@ from datetime import datetime
 def lambda_handler(event, context):
     """Main Lambda handler for task organization"""
     try:
-        # Parse request
         body = json.loads(event['body']) if isinstance(event['body'], str) else event['body']
         new_task = body['task']
         source = body.get('source', 'unknown')
         
-        # Organize with Bedrock
         organized_task = organize_with_bedrock(new_task)
-        
-        # Store in DynamoDB
         task_id = store_task(organized_task, source)
+        
+        # Find and store task links
+        find_and_store_links(task_id, organized_task)
         
         return {
             'statusCode': 200,
@@ -81,6 +80,72 @@ Return only valid JSON, no other text."""
             'estimated_time': 30,
             'tags': []
         }
+
+def find_and_store_links(new_task_id, new_task):
+    """Find links between new task and existing tasks"""
+    dynamodb = boto3.resource('dynamodb')
+    tasks_table = dynamodb.Table('tasks')
+    links_table = dynamodb.Table('task-links')
+    
+    # Get existing tasks
+    response = tasks_table.scan()
+    existing_tasks = [item for item in response['Items'] if item['id'] != new_task_id]
+    
+    if not existing_tasks:
+        return
+    
+    # Use Bedrock to find links
+    bedrock = boto3.client('bedrock-runtime')
+    
+    existing_tasks_text = "\n".join([
+        f"ID: {task['id']}, Task: {task['task']}, Category: {task['category']}"
+        for task in existing_tasks
+    ])
+    
+    prompt = f"""Analyze if this new task has relationships with existing tasks.
+
+New Task: {new_task['task']} (Category: {new_task['category']})
+
+Existing Tasks:
+{existing_tasks_text}
+
+Return ONLY a JSON array of task IDs that are related to the new task. Consider:
+- Similar topics or projects
+- Dependencies (one task blocks another)
+- Sequential tasks in same category
+- Related shopping items
+- Connected work projects
+
+Return empty array [] if no relationships found.
+Example: ["task-id-1", "task-id-2"]"""
+    
+    print(f"Prompt for link finding: {prompt}")
+
+    try:
+        response = bedrock.invoke_model(
+            modelId='anthropic.claude-3-haiku-20240307-v1:0',
+            body=json.dumps({
+                'anthropic_version': 'bedrock-2023-05-31',
+                'messages': [{'role': 'user', 'content': prompt}],
+                'max_tokens': 200
+            })
+        )
+        
+        result = json.loads(response['body'].read())
+        print(f"Link finding result: {result}")
+        linked_task_ids = json.loads(result['content'][0]['text'])
+        
+        # Store links
+        for linked_id in linked_task_ids:
+            links_table.put_item(Item={
+                'source_task_id': new_task_id,
+                'target_task_id': linked_id,
+                'link_type': 'related',
+                'created_at': datetime.now().isoformat()
+            })
+            
+    except Exception as e:
+        print(f"Link finding error: {str(e)}")
 
 def store_task(organized_task, source):
     """Store task in DynamoDB"""

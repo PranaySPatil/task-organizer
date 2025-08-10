@@ -27,6 +27,28 @@ resource "aws_dynamodb_table" "tasks" {
   }
 }
 
+# Task Links Table
+resource "aws_dynamodb_table" "task_links" {
+  name           = "task-links"
+  billing_mode   = "PAY_PER_REQUEST"
+  hash_key       = "source_task_id"
+  range_key      = "target_task_id"
+
+  attribute {
+    name = "source_task_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "target_task_id"
+    type = "S"
+  }
+
+  tags = {
+    Name = "TaskLinksTable"
+  }
+}
+
 # Lambda Function
 resource "aws_lambda_function" "task_organizer" {
   filename         = "../task_organizer.zip"
@@ -35,6 +57,7 @@ resource "aws_lambda_function" "task_organizer" {
   handler         = "lambda_function.lambda_handler"
   runtime         = "python3.9"
   timeout         = 30
+  source_code_hash = filebase64sha256("../task_organizer.zip")
 
   depends_on = [aws_cloudwatch_log_group.lambda_logs]
 }
@@ -80,7 +103,10 @@ resource "aws_iam_role_policy" "dynamodb_policy" {
           "dynamodb:Query",
           "dynamodb:UpdateItem"
         ]
-        Resource = aws_dynamodb_table.tasks.arn
+        Resource = [
+          aws_dynamodb_table.tasks.arn,
+          aws_dynamodb_table.task_links.arn
+        ]
       }
     ]
   })
