@@ -1,4 +1,4 @@
-#!/Users/prantil/task-organizer/venv/bin/python
+#!/Users/prantil/task-organizer/venv/bin/python3
 """
 Mac script for adding tasks via Alfred
 Sends task to AWS Lambda for organization

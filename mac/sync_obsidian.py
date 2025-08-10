@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!//Users/prantil/task-organizer/venv/bin/python3
 """
 Sync tasks from DynamoDB to Obsidian vault
 Run this script periodically to keep Obsidian updated

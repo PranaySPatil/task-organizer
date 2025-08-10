@@ -25,7 +25,7 @@ fi
 # Setup cron job for automatic sync
 echo "⏰ Setting up automatic sync (every 5 minutes)..."
 SCRIPT_PATH="$(pwd)/sync_obsidian.py"
-CRON_JOB="*/5 * * * * /usr/bin/python3 $SCRIPT_PATH"
+CRON_JOB="*/5 * * * * /Users/prantil/task-organizer/venv/bin/python3 $SCRIPT_PATH"
 
 # Add to crontab if not already present
 (crontab -l 2>/dev/null | grep -v "$SCRIPT_PATH"; echo "$CRON_JOB") | crontab -
