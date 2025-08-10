@@ -27,20 +27,27 @@
    ```python
    import sys
    import subprocess
-   
+      
    query = sys.argv[1] if len(sys.argv) > 1 else ""
+   python_env_path = "/Users/prantil/task-organizer/venv/bin/python3"
    script_path = "/Users/prantil/task-organizer/mac/add_task.py"
-   
-   result = subprocess.run(["/usr/bin/python3", script_path, query], 
-                          capture_output=True, text=True)
-   
+      
+   result = subprocess.run([python_env_path, script_path, query], capture_output=True, text=True)
+      
    print(result.stdout if result.stdout else result.stderr)
    ```
+
+## Add Post Notification
+1. In Alfred workflow, click + → Outputs → Post Notification
+2. Configure notification:
+   - **Title**: Task Result
+   - **Text**: {query}
 
 ## Connect Components
 
 1. Drag from **Keyword** output to **Run Script** input
-2. Save workflow
+2. Connect the Run Script output to Post Notification input
+3. Save workflow
 
 ## Test
 
