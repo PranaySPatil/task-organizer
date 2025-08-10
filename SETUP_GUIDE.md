@@ -14,14 +14,6 @@ Complete setup guide for the AI-powered task organization system.
 
 ### 1. Environment Configuration
 
-```bash
-# Copy environment template
-cp .env.example .env
-
-# Edit .env with your values
-nano .env
-```
-
 Required variables:
 - `AWS_REGION`: Your AWS region (e.g., us-east-1)
 - `OBSIDIAN_VAULT_PATH`: Path to your Obsidian vault
